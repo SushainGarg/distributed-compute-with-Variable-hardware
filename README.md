@@ -52,21 +52,22 @@ This repository maintains the production architecture for a multi-node, uneven G
 
 ## 2. Structural Component Matrix
 
-| Layer | Component Selected | Architectural Role / Guardrail |
-| :--- | :--- | :--- |
-| **Physical Interconnect** | Standard LAN Subnet | **Data Parallel/gRPC Only.** Sharded tensor parallelism (FSDP/Megatron) across nodes is strictly banned due to network limits. |
-| **Storage Sub-System** | S3-Compatible / NFS | **Decoupled Persistence.** Centralized hub for plug-and-play weights and simulation logs; mounted to all K8s workers. |
-| **Infrastructure** | K3s (Lightweight K8s) | **Resource Pooling.** Creates a unified fabric across heterogeneous hardware; handles self-healing container lifetimes. |
-| **Device Management** | NVIDIA Device Plugin | **Resource Profiling.** Discovers and exposes distinct host GPU capacities (`nvidia.com/gpu`) up to the K8s API. |
-| **Cluster Bridge** | KubeRay Operator | **Dynamic Provisioning.** Automates the translation of Python ML scaling into K8s Head/Worker pod deployments. |
-| **Inference Engine** | Ray Serve | **Dynamic Ingress Graph.** Abstracts the GPU matrix into a hot-swappable, lazy-loading multi-application web API. |
-| **Simulation Engine** | AlpaSim Framework | **Modular Microservices.** Uses Node Affinity constraints to force heavy rendering and VLA policies to sit on identical physical PCIe lanes. |
+| Layer                     | Component Selected    | Architectural Role / Guardrail                                                                                                               |
+| :------------------------ | :-------------------- | :------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Physical Interconnect** | Standard LAN Subnet   | **Data Parallel/gRPC Only.** Sharded tensor parallelism (FSDP/Megatron) across nodes is strictly banned due to network limits.               |
+| **Storage Sub-System**    | S3-Compatible / NFS   | **Decoupled Persistence.** Centralized hub for plug-and-play weights and simulation logs; mounted to all K8s workers.                        |
+| **Infrastructure**        | K3s (Lightweight K8s) | **Resource Pooling.** Creates a unified fabric across heterogeneous hardware; handles self-healing container lifetimes.                      |
+| **Device Management**     | NVIDIA Device Plugin  | **Resource Profiling.** Discovers and exposes distinct host GPU capacities (`nvidia.com/gpu`) up to the K8s API.                             |
+| **Cluster Bridge**        | KubeRay Operator      | **Dynamic Provisioning.** Automates the translation of Python ML scaling into K8s Head/Worker pod deployments.                               |
+| **Inference Engine**      | Ray Serve             | **Dynamic Ingress Graph.** Abstracts the GPU matrix into a hot-swappable, lazy-loading multi-application web API.                            |
+| **Simulation Engine**     | AlpaSim Framework     | **Modular Microservices.** Uses Node Affinity constraints to force heavy rendering and VLA policies to sit on identical physical PCIe lanes. |
 
 ---
 
 ## 3. Workload Execution Frameworks
 
 ### Dynamic Inference Loop (`RayService`)
+
 ```yaml
 Model Request -> [API Gateway Router] -> [Check Active Memory] ──(If Missing)──> [Pull Weights from S3/NFS]
                                 |                                                        |
@@ -85,7 +86,7 @@ Model Request -> [API Gateway Router] -> [Check Active Memory] ──(If Missing
 ```text
 gpu-cluster-infra/
 ├── .gitignore
-├── README.md           
+├── README.md
 ├── scripts/
 │   ├── install-nvidia.sh   <-- Drivers & Container Toolkit
 │   └── setup-nfs.sh        <-- Exports the local Storage Drive
@@ -98,3 +99,13 @@ gpu-cluster-infra/
         ├── inference/      <-- RayService YAMLs (vLLM, custom APIs)
         └── alpasim/        <-- RayJob or Pod configurations
 ```
+
+## 4. Physical Node Capabilities & Cluster Tiers
+
+| Node Name              | CPU Specs                    | System RAM | Installed GPUs                      | VRAM           | Cluster Tier Label   |
+| :--------------------- | :--------------------------- | :--------- | :---------------------------------- | :------------- | :------------------- |
+| **ml7** (Master)       | Threadripper 3960X (24c/48t) | 96 GB      | 2x RTX Titan<br>4x RTX 3090         | 24 GB<br>24 GB | `gpu-tier=ultra`     |
+| **researcher-desktop** | Threadripper 3970X (32c/64t) | 128 GB     | 4x RTX 3090                         | 24 GB          | `gpu-tier=ultra`     |
+| **ml3**                | Xeon E5-2667 v4 (8c/16t)     | 64 GB      | 1x RTX 6000                         | 24 GB          | `gpu-tier=mid`       |
+| **ml1**                | Xeon E5-2667 v4 (8c/16t)     | 64 GB      | 1x Quadro P6000                     | 24 GB          | `gpu-tier=legacy`    |
+| **ml0**                | i7-5960X (8c/16t)            | 64 GB      | 2x RTX 2080Ti<br>1x Quadro RTX 6000 | 12 GB<br>24 GB | `gpu-tier=mixed-low` |

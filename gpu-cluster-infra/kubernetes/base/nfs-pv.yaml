@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: cluster-nfs-pv
+spec:
+  capacity:
+    storage: 5Ti
+  volumeMode: Filesystem
+  accessModes:
+    - ReadWriteMany
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: local-nfs
+  nfs:
+    path: /mnt/hdd1/cluster-storage
+    server: <MASTER_NODE_IP>
