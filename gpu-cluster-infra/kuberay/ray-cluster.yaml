@@ -1,0 +1,158 @@
+apiVersion: ray.io/v1
+kind: RayCluster
+metadata:
+  name: dynamic-gpu-fleet
+  namespace: alpa
+spec:
+  rayVersion: "2.35.0"
+  headGroupSpec:
+    rayStartParams:
+      dashboard-host: "0.0.0.0"
+    template:
+      spec:
+        imagePullSecrets:
+          - name: dockerhub-cred
+        nodeSelector:
+          kubernetes.io/role: master
+        containers:
+          - name: ray-head
+            image: rayproject/ray-ml:nightly-py311-cpu
+            ports:
+              - containerPort: 6379
+                name: gcs
+              - containerPort: 8265
+                name: dashboard
+              - containerPort: 10001
+                name: client
+            resources:
+              limits:
+                cpu: "4"
+                memory: "16Gi"
+              requests:
+                cpu: "2"
+                memory: "8Gi"
+  workerGroupSpecs:
+    - groupName: ultra-4gpu-pool
+      replicas: 1
+      minReplicas: 0
+      maxReplicas: 1
+      rayStartParams: {}
+      template:
+        spec:
+          runtimeClassName: nvidia
+          imagePullSecrets:
+            - name: dockerhub-cred
+          nodeSelector:
+            kubernetes.io/hostname: researcher-desktop
+          containers:
+            - name: ray-worker-4gpu
+              image: rayproject/ray-ml:nightly-py311-gpu
+              resources:
+                limits:
+                  cpu: "24"
+                  memory: "96Gi"
+                  nvidia.com/gpu: "4"
+                requests:
+                  cpu: "12"
+                  memory: "48Gi"
+                  nvidia.com/gpu: "4"
+              volumeMounts:
+                - name: shared-storage
+                  mountPath: /mnt/data
+          volumes:
+            - name: shared-storage
+              persistentVolumeClaim:
+                claimName: cluster-storage-pvc
+    - groupName: ultra-2gpu-pool
+      replicas: 1
+      minReplicas: 0
+      maxReplicas: 1
+      rayStartParams: {}
+      template:
+        spec:
+          runtimeClassName: nvidia
+          imagePullSecrets:
+            - name: dockerhub-cred
+          nodeSelector:
+            kubernetes.io/hostname: ml7
+          containers:
+            - name: ray-worker-2gpu
+              image: rayproject/ray-ml:nightly-py311-gpu
+              resources:
+                limits:
+                  cpu: "16"
+                  memory: "84Gi"
+                  nvidia.com/gpu: "2"
+                requests:
+                  cpu: "8"
+                  memory: "64Gi"
+                  nvidia.com/gpu: "2"
+              volumeMounts:
+                - name: shared-storage
+                  mountPath: /mnt/data
+          volumes:
+            - name: shared-storage
+              persistentVolumeClaim:
+                claimName: cluster-storage-pvc
+    - groupName: mixed-low-3gpu-pool
+      replicas: 1
+      minReplicas: 0
+      maxReplicas: 1
+      rayStartParams: {}
+      template:
+        spec:
+          runtimeClassName: nvidia
+          imagePullSecrets:
+            - name: dockerhub-cred
+          nodeSelector:
+            kubernetes.io/hostname: ml0
+          containers:
+            - name: ray-worker-3gpu
+              image: rayproject/ray-ml:nightly-py311-gpu
+              resources:
+                limits:
+                  cpu: "16"
+                  memory: "56Gi"
+                  nvidia.com/gpu: "3"
+                requests:
+                  cpu: "8"
+                  memory: "32Gi"
+                  nvidia.com/gpu: "3"
+              volumeMounts:
+                - name: shared-storage
+                  mountPath: /mnt/data
+          volumes:
+            - name: shared-storage
+              persistentVolumeClaim:
+                claimName: cluster-storage-pvc
+    - groupName: mid-1gpu-pool
+      replicas: 1
+      minReplicas: 0
+      maxReplicas: 1
+      rayStartParams: {}
+      template:
+        spec:
+          runtimeClassName: nvidia
+          imagePullSecrets:
+            - name: dockerhub-cred
+          nodeSelector:
+            gpu-tier: mid
+          containers:
+            - name: ray-worker-1gpu
+              image: rayproject/ray-ml:nightly-py311-gpu
+              resources:
+                limits:
+                  cpu: "16"
+                  memory: "56Gi"
+                  nvidia.com/gpu: "1"
+                requests:
+                  cpu: "8"
+                  memory: "32Gi"
+                  nvidia.com/gpu: "1"
+              volumeMounts:
+                - name: shared-storage
+                  mountPath: /mnt/data
+          volumes:
+            - name: shared-storage
+              persistentVolumeClaim:
+                claimName: cluster-storage-pvc
