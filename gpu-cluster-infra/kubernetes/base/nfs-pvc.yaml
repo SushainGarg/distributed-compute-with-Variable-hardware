@@ -2,10 +2,11 @@ apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   name: cluster-storage-pvc
+  namespace: alpa
 spec:
   accessModes:
     - ReadWriteMany
   storageClassName: local-nfs
   resources:
     requests:
-      storage: 5Ti
+      storage: 2Ti

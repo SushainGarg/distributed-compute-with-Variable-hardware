@@ -31,38 +31,14 @@ spec:
               requests:
                 cpu: "2"
                 memory: "8Gi"
+            volumeMounts:
+              - name: shared-storage
+                mountPath: /mnt/data
+        volumes:
+          - name: shared-storage
+            persistentVolumeClaim:
+              claimName: cluster-storage-pvc
   workerGroupSpecs:
-    - groupName: ultra-4gpu-pool
-      replicas: 1
-      minReplicas: 0
-      maxReplicas: 1
-      rayStartParams: {}
-      template:
-        spec:
-          runtimeClassName: nvidia
-          imagePullSecrets:
-            - name: dockerhub-cred
-          nodeSelector:
-            kubernetes.io/hostname: researcher-desktop
-          containers:
-            - name: ray-worker-4gpu
-              image: rayproject/ray-ml:nightly-py311-gpu
-              resources:
-                limits:
-                  cpu: "24"
-                  memory: "96Gi"
-                  nvidia.com/gpu: "4"
-                requests:
-                  cpu: "12"
-                  memory: "48Gi"
-                  nvidia.com/gpu: "4"
-              volumeMounts:
-                - name: shared-storage
-                  mountPath: /mnt/data
-          volumes:
-            - name: shared-storage
-              persistentVolumeClaim:
-                claimName: cluster-storage-pvc
     - groupName: ultra-2gpu-pool
       replicas: 1
       minReplicas: 0

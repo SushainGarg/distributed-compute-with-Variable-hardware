@@ -1,0 +1,76 @@
+1. sudo nano /etc/containerd/config.toml
+2.
+version = 2
+
+[plugins]
+  [plugins."io.containerd.grpc.v1.cri"]
+    stream_server_address = "127.0.0.1"
+    stream_server_port = "10010"
+    enable_selinux = false
+
+    [plugins."io.containerd.grpc.v1.cri".cni]
+      bin_dir = "/var/lib/rancher/k3s/data/current/bin"
+      conf_dir = "/var/lib/rancher/k3s/agent/etc/cni/net.d"
+
+    [plugins."io.containerd.grpc.v1.cri".containerd]
+      default_runtime_name = "nvidia"
+
+      [plugins."io.containerd.grpc.v1.cri".containerd.runtimes]
+        [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.nvidia]
+          privileged_without_host_devices = false
+          runtime_type = "io.containerd.runc.v2"
+
+          [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.nvidia.options]
+            BinaryName = "/usr/bin/nvidia-container-runtime"
+
+3. sudo systemctl restart containerd
+4. curl -sfL https://k3s.io | sh -s - --container-runtime-endpoint=/var/run/containerd/containerd.sock
+
+5. mkdir -p $HOME/.kube
+6. sudo cp /etc/rancher/k3s/k3s.yaml $HOME/.kube/config
+7. sudo chown $(id -u):$(id -g) $HOME/.kube/config
+8. chmod 600 $HOME/.kube/config
+9. export KUBECONFIG=$HOME/.kube/config
+
+10.
+cat <<EOF | kubectl apply -f -
+apiVersion: node.k8s.io/v1
+kind: RuntimeClass
+metadata:
+  name: nvidia
+handler: nvidia
+EOF
+
+11.
+sudo cat /var/lib/rancher/k3s/server/node-token
+
+12.
+kubectl label node master-node-name nvidia.com/gpu.present=true
+
+13.
+kubectl label node node-name nvidia.com/gpu.present=true
+
+14.
+curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+
+15.
+helm repo add nvdp https://nvidia.github.io/k8s-device-plugin
+16.
+helm repo update
+17.
+sudo ctr --namespace k8s.io images pull nvcr.io/nvidia/k8s-device-plugin:v0.19.2
+
+18.
+helm upgrade --install nvdp nvdp/nvidia-device-plugin \
+  --namespace nvidia-device-plugin \
+  --create-namespace \
+  --set image.repository=nvcr.io/nvidia/k8s-device-plugin \
+  --set image.tag=v0.19.2 \
+  --set runtimeClassName=nvidia \
+  --set failOnInitError=true
+
+19.
+kubectl get pods -n nvidia-device-plugin
+
+20.
+kubectl get nodes "-o=custom-columns=NAME:.metadata.name,STATUS:.status.conditions[-1].type,GPUs:.status.allocatable.nvidia\.com/gpu"
