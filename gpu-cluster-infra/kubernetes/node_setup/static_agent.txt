@@ -1,0 +1,8 @@
+1. sudo k3s-uninstall.sh 2>/dev/null || sudo k3s-agent-uninstall.sh 2>/dev/null
+2. sudo rm -rf /etc/rancher/k3s $HOME/.kube
+3. sudo systemctl stop containerd
+4. sudo systemctl disable containerd
+
+5. export MY_MASTER_URL="https://<IP>:6443"
+6. export MY_MASTER_TOKEN="<SERVER_TOK>"
+7. curl -sfL https://get.k3s.io | env K3S_URL="$MY_MASTER_URL" K3S_TOKEN="$MY_MASTER_TOKEN" sh -
