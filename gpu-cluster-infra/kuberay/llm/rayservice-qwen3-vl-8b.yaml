@@ -1,0 +1,89 @@
+apiVersion: ray.io/v1
+kind: RayService
+metadata:
+  name: scene-search-llm
+  namespace: alpa
+spec:
+  serveConfigV2: |
+    applications:
+      - name: llms
+        import_path: ray.serve.llm:build_openai_app
+        route_prefix: "/"
+        args:
+          llm_configs:
+            - model_loading_config:
+                model_id: Qwen/Qwen3-VL-8B-Instruct
+                model_source: /mnt/data/models/Qwen3-VL-8B-Instruct
+              deployment_config:
+                autoscaling_config:
+                  min_replicas: 1
+                  max_replicas: 1
+              engine_kwargs:
+                tensor_parallel_size: 1
+                max_model_len: 32768
+                gpu_memory_utilization: 0.90
+                limit_mm_per_prompt:
+                  image: 16
+  rayClusterConfig:
+    rayVersion: "2.55.0"
+    headGroupSpec:
+      rayStartParams:
+        dashboard-host: "0.0.0.0"
+        num-gpus: "0"
+      template:
+        spec:
+          imagePullSecrets:
+            - name: dockerhub-cred
+          nodeSelector:
+            kubernetes.io/role: master
+          containers:
+            - name: ray-head
+              image: rayproject/ray-llm:2.55.0-py311-cu128
+              env:
+                - {name: HF_HUB_OFFLINE, value: "1"}
+                - {name: TRANSFORMERS_OFFLINE, value: "1"}
+              ports:
+                - {containerPort: 6379, name: gcs}
+                - {containerPort: 8265, name: dashboard}
+                - {containerPort: 10001, name: client}
+                - {containerPort: 8000, name: serve}
+              resources:
+                limits: {cpu: "4", memory: "16Gi"}
+                requests: {cpu: "2", memory: "8Gi"}
+              volumeMounts:
+                - {name: shared-storage, mountPath: /mnt/data}
+          volumes:
+            - name: shared-storage
+              persistentVolumeClaim:
+                claimName: cluster-storage-pvc
+    workerGroupSpecs:
+      - groupName: llm-1gpu
+        replicas: 1
+        minReplicas: 1
+        maxReplicas: 1
+        rayStartParams: {}
+        template:
+          spec:
+            runtimeClassName: nvidia
+            imagePullSecrets:
+              - name: dockerhub-cred
+            nodeSelector:
+              gpu-tier: high_ada
+            containers:
+              - name: ray-worker
+                image: rayproject/ray-llm:2.55.0-py311-cu128
+                env:
+                  - {name: HF_HUB_OFFLINE, value: "1"}
+                  - {name: TRANSFORMERS_OFFLINE, value: "1"}
+                resources:
+                  limits: {cpu: "16", memory: "56Gi", nvidia.com/gpu: "1"}
+                  requests: {cpu: "8", memory: "32Gi", nvidia.com/gpu: "1"}
+                volumeMounts:
+                  - {name: shared-storage, mountPath: /mnt/data, readOnly: true}
+                  - {name: dshm, mountPath: /dev/shm}
+            volumes:
+              - name: shared-storage
+                persistentVolumeClaim:
+                  claimName: cluster-storage-pvc
+              - name: dshm
+                emptyDir: {medium: Memory, sizeLimit: 16Gi}
