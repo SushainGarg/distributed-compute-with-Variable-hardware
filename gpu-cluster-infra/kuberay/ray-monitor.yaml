@@ -1,0 +1,14 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: ray-cluster-monitor
+  namespace: alpa
+  labels:
+    ray.io/cluster: dynamic-gpu-fleet
+spec:
+  selector:
+    matchLabels:
+      ray.io/node-type: head
+  endpoints:
+    - port: metrics
+      interval: 15s

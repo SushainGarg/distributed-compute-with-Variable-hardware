@@ -16,7 +16,7 @@ spec:
           kubernetes.io/role: master
         containers:
           - name: ray-head
-            image: rayproject/ray-ml:nightly-py311-cpu
+            image: rayproject/ray:nightly-py311-cpu
             ports:
               - containerPort: 6379
                 name: gcs
@@ -53,7 +53,7 @@ spec:
             kubernetes.io/hostname: ml7
           containers:
             - name: ray-worker-2gpu
-              image: rayproject/ray-ml:nightly-py311-gpu
+              image: rayproject/ray:nightly-py311-gpu
               resources:
                 limits:
                   cpu: "16"
@@ -84,7 +84,7 @@ spec:
             kubernetes.io/hostname: ml0
           containers:
             - name: ray-worker-3gpu
-              image: rayproject/ray-ml:nightly-py311-gpu
+              image: rayproject/ray:nightly-py311-gpu
               resources:
                 limits:
                   cpu: "16"
@@ -115,7 +115,7 @@ spec:
             gpu-tier: mid
           containers:
             - name: ray-worker-1gpu
-              image: rayproject/ray-ml:nightly-py311-gpu
+              image: rayproject/ray:nightly-py311-gpu
               resources:
                 limits:
                   cpu: "16"
