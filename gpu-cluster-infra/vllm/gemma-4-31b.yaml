@@ -31,7 +31,7 @@ spec:
             - --quantization=fp8
             - --max-model-len=32768
             - --gpu-memory-utilization=0.90
-            - '--limit-mm-per-prompt={"image": 16}'
+            - '--limit-mm-per-prompt={"image": 32}'
           env:
             - {name: HF_HUB_OFFLINE, value: "1"}
             - {name: TRANSFORMERS_OFFLINE, value: "1"}

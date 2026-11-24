@@ -30,7 +30,7 @@ spec:
             - --tensor-parallel-size=1
             - --max-model-len=16384
             - --gpu-memory-utilization=0.92
-            - '--limit-mm-per-prompt={"image": 16}'
+            - '--limit-mm-per-prompt={"image": 32}'
           env:
             - {name: HF_HUB_OFFLINE, value: "1"}
             - {name: TRANSFORMERS_OFFLINE, value: "1"}
