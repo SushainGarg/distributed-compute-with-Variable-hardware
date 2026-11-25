@@ -18,6 +18,11 @@ spec:
         - name: dockerhub-cred
       nodeSelector:
         gpu-tier: high_ada
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector: {matchLabels: {app: vllm-gemma-4-31b}}
       containers:
         - name: vllm
           image: vllm/vllm-openai:v0.28.0
