@@ -1,0 +1,53 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: ss-${JOB_NAME}
+  namespace: alpa
+  labels: {app: scene-search, job: ss-${JOB_NAME}}
+spec:
+  completionMode: Indexed
+  completions: ${WORKERS}
+  parallelism: ${WORKERS}
+  backoffLimitPerIndex: 2
+  maxFailedIndexes: ${WORKERS}
+  ttlSecondsAfterFinished: 86400
+  template:
+    metadata:
+      labels: {app: scene-search, job: ss-${JOB_NAME}}
+    spec:
+      restartPolicy: Never
+      runtimeClassName: nvidia
+      imagePullSecrets:
+        - name: dockerhub-cred
+      nodeSelector:
+        gpu-tier: ${GPU_TIER}
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector: {matchLabels: {job: ss-${JOB_NAME}}}
+      containers:
+        - name: scene-search
+          image: ${IMAGE}
+          imagePullPolicy: IfNotPresent
+          workingDir: /app
+          command: [bash, -c]
+          args:
+            - |
+              export RANK=$JOB_COMPLETION_INDEX WORLD_SIZE=${WORKERS}
+              python experiments/${SCRIPT} ${ARGS} site=jlr site.models_root=/mnt/data/models site.artifacts_root=${ARTIFACTS} site.datasets_root=${DATASETS} site.half_dtype=bfloat16 store=npy hydra.run.dir=${ARTIFACTS}/hydra/k8s/${JOB_NAME}/rank$JOB_COMPLETION_INDEX
+          env:
+            - {name: HF_HUB_OFFLINE, value: "1"}
+            - {name: TRANSFORMERS_OFFLINE, value: "1"}
+          resources:
+            limits: {cpu: "16", memory: "${MEMORY}", nvidia.com/gpu: "1"}
+            requests: {cpu: "8", memory: "24Gi", nvidia.com/gpu: "1"}
+          volumeMounts:
+            - {name: shared-storage, mountPath: /mnt/data}
+            - {name: dshm, mountPath: /dev/shm}
+      volumes:
+        - name: shared-storage
+          persistentVolumeClaim:
+            claimName: cluster-storage-pvc
+        - name: dshm
+          emptyDir: {medium: Memory, sizeLimit: 16Gi}

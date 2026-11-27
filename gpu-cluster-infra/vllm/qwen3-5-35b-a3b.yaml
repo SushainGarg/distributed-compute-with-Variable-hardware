@@ -1,0 +1,75 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vllm-qwen3-5-35b-a3b
+  namespace: alpa
+  labels: {app: vllm-qwen3-5-35b-a3b}
+spec:
+  replicas: 1
+  strategy: {type: Recreate}
+  selector:
+    matchLabels: {app: vllm-qwen3-5-35b-a3b}
+  template:
+    metadata:
+      labels: {app: vllm-qwen3-5-35b-a3b}
+    spec:
+      runtimeClassName: nvidia
+      imagePullSecrets:
+        - name: dockerhub-cred
+      nodeSelector:
+        gpu-tier: high_ada
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector: {matchLabels: {app: vllm-qwen3-5-35b-a3b}}
+      containers:
+        - name: vllm
+          image: vllm/vllm-openai:v0.28.0
+          imagePullPolicy: IfNotPresent
+          args:
+            - /mnt/data/models/Qwen3.5-35B-A3B
+            - --served-model-name=Qwen/Qwen3.5-35B-A3B
+            - --host=0.0.0.0
+            - --port=8000
+            - --tensor-parallel-size=1
+            - --quantization=fp8
+            - --reasoning-parser=qwen3
+            - --max-model-len=32768
+            - --gpu-memory-utilization=0.90
+            - '--limit-mm-per-prompt={"image": 32}'
+          env:
+            - {name: HF_HUB_OFFLINE, value: "1"}
+            - {name: TRANSFORMERS_OFFLINE, value: "1"}
+          ports:
+            - {containerPort: 8000, name: http}
+          resources:
+            limits: {cpu: "16", memory: "100Gi", nvidia.com/gpu: "1"}
+            requests: {cpu: "8", memory: "64Gi", nvidia.com/gpu: "1"}
+          startupProbe:
+            httpGet: {path: /health, port: 8000}
+            periodSeconds: 20
+            failureThreshold: 270
+          readinessProbe:
+            httpGet: {path: /health, port: 8000}
+            periodSeconds: 10
+          volumeMounts:
+            - {name: shared-storage, mountPath: /mnt/data, readOnly: true}
+            - {name: dshm, mountPath: /dev/shm}
+      volumes:
+        - name: shared-storage
+          persistentVolumeClaim:
+            claimName: cluster-storage-pvc
+        - name: dshm
+          emptyDir: {medium: Memory, sizeLimit: 16Gi}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: vllm-qwen3-5-35b-a3b
+  namespace: alpa
+spec:
+  type: NodePort
+  selector: {app: vllm-qwen3-5-35b-a3b}
+  ports:
+    - {name: http, port: 8000, targetPort: 8000, nodePort: 30811}

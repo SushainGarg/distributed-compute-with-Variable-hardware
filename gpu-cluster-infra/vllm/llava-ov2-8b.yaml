@@ -1,0 +1,74 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vllm-llava-ov2-8b
+  namespace: alpa
+  labels: {app: vllm-llava-ov2-8b}
+spec:
+  replicas: 1
+  strategy: {type: Recreate}
+  selector:
+    matchLabels: {app: vllm-llava-ov2-8b}
+  template:
+    metadata:
+      labels: {app: vllm-llava-ov2-8b}
+    spec:
+      runtimeClassName: nvidia
+      imagePullSecrets:
+        - name: dockerhub-cred
+      nodeSelector:
+        gpu-tier: mid
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector: {matchLabels: {app: vllm-llava-ov2-8b}}
+      containers:
+        - name: vllm
+          image: vllm/vllm-openai:v0.28.0
+          imagePullPolicy: IfNotPresent
+          args:
+            - /mnt/data/models/LLaVA-OneVision-2-8B-Instruct
+            - --served-model-name=lmms-lab-encoder/LLaVA-OneVision-2-8B-Instruct
+            - --host=0.0.0.0
+            - --port=8000
+            - --tensor-parallel-size=1
+            - --trust-remote-code
+            - --max-model-len=16384
+            - --gpu-memory-utilization=0.92
+            - '--limit-mm-per-prompt={"image": 32}'
+          env:
+            - {name: HF_HUB_OFFLINE, value: "1"}
+            - {name: TRANSFORMERS_OFFLINE, value: "1"}
+          ports:
+            - {containerPort: 8000, name: http}
+          resources:
+            limits: {cpu: "8", memory: "22Gi", nvidia.com/gpu: "1"}
+            requests: {cpu: "4", memory: "16Gi", nvidia.com/gpu: "1"}
+          startupProbe:
+            httpGet: {path: /health, port: 8000}
+            periodSeconds: 20
+            failureThreshold: 120
+          readinessProbe:
+            httpGet: {path: /health, port: 8000}
+            periodSeconds: 10
+          volumeMounts:
+            - {name: shared-storage, mountPath: /mnt/data, readOnly: true}
+            - {name: dshm, mountPath: /dev/shm}
+      volumes:
+        - name: shared-storage
+          persistentVolumeClaim:
+            claimName: cluster-storage-pvc
+        - name: dshm
+          emptyDir: {medium: Memory, sizeLimit: 16Gi}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: vllm-llava-ov2-8b
+  namespace: alpa
+spec:
+  type: NodePort
+  selector: {app: vllm-llava-ov2-8b}
+  ports:
+    - {name: http, port: 8000, targetPort: 8000, nodePort: 30810}
