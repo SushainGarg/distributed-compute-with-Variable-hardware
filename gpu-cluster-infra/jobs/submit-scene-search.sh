@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-usage="usage: IMAGE=<registry/scene-search:tag> [GPU_TIER=high_ada] [MEMORY=64Gi] [ARTIFACTS=/mnt/data/scene_search/artifacts] [DATASETS=/mnt/data/scene_search/datasets] $0 <job-name> <workers> <script.py> -- <overrides>"
+usage="usage: IMAGE=590183833763.dkr.ecr.eu-west-2.amazonaws.com/scene_search_evaluation/experiments:<tag> [GPU_TIER=high_ada] [MEMORY=64Gi] [ARTIFACTS=/mnt/data/scene_search/artifacts] [DATASETS=/mnt/data/scene_search/datasets] $0 <job-name> <workers> <script.py> -- <overrides>"
 : "${IMAGE:?$usage}"
 JOB_NAME=${1:?$usage}
 WORKERS=${2:?$usage}

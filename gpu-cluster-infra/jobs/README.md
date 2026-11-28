@@ -46,23 +46,37 @@ The full GLM-4.6V (106B; ~210 GB BF16, ~110 GB FP8) does not fit any node: skip 
 
 ## 3. Container image (once per code change)
 
-Built from the scene-search repo (`embedding_analysis/`), pushed to the registry the nodes pull from (`dockerhub-cred`):
+Built from the scene-search repo (`embedding_analysis/`) and pushed to ECR (`590183833763.dkr.ecr.eu-west-2.amazonaws.com/scene_search_evaluation/experiments`, eu-west-2). Tag each build with the commit, so nodes never run a stale image (`imagePullPolicy: IfNotPresent`):
 
 ```bash
+REGISTRY=590183833763.dkr.ecr.eu-west-2.amazonaws.com
+REPO=$REGISTRY/scene_search_evaluation/experiments
+TAG=$(git rev-parse --short HEAD)
+aws ecr get-login-password --region eu-west-2 | docker login --username AWS --password-stdin $REGISTRY
 cd embedding_analysis && uv lock                       # after any pyproject change
-docker build -f docker/Dockerfile -t <registry>/scene-search:<tag> .
-docker build -f docker/Dockerfile --build-arg TRANSFORMERS=">=5.12.1" -t <registry>/scene-search:<tag>-t5 .   # Ovis / EmbeddingGemma 2
-docker push <registry>/scene-search:<tag> && docker push <registry>/scene-search:<tag>-t5
+docker build -f docker/Dockerfile -t $REPO:$TAG .
+docker build -f docker/Dockerfile --build-arg TRANSFORMERS=">=5.12.1" -t $REPO:$TAG-t5 .   # Ovis / EmbeddingGemma 2
+docker push $REPO:$TAG && docker push $REPO:$TAG-t5
 ```
+
+Nodes have no AWS identity, so pods pull with the `ecr-cred` secret, made from a token that **expires after 12 hours**. Create or refresh it (on the master) before submitting jobs:
+
+```bash
+kubectl -n alpa delete secret ecr-cred --ignore-not-found
+kubectl -n alpa create secret docker-registry ecr-cred --docker-server=590183833763.dkr.ecr.eu-west-2.amazonaws.com \
+  --docker-username=AWS --docker-password="$(aws ecr get-login-password --region eu-west-2)"
+```
+
+Pods that already pulled the image keep running after the token expires; only new pulls need a fresh secret.
 
 ## 4. Free GPUs and submit
 
 ```bash
 vllm/set-ray-workers.sh max-ultra-1gpu-pool 0                          # free 48 GB Ada GPUs (see vllm/SCALING.md)
-export IMAGE=<registry>/scene-search:<tag>
+export IMAGE=590183833763.dkr.ecr.eu-west-2.amazonaws.com/scene_search_evaluation/experiments:<tag>
 jobs/submit-scene-search.sh qwen8b-bdd 4 ingest.py -- source=dataset dataset=bdd100k "'ingest_models=[qwen3_vl_embedding_8b]'"
 jobs/submit-scene-search.sh gve7b-nus-clips 2 ingest_clips.py -- dataset=nuscenes "'ingest_models=[gve_7b]'"
-IMAGE=<registry>/scene-search:<tag>-t5 jobs/submit-scene-search.sh ovis-bdd 2 ingest.py -- source=dataset dataset=bdd100k "'ingest_models=[ovis_vl_embedding_2b]'"
+IMAGE=590183833763.dkr.ecr.eu-west-2.amazonaws.com/scene_search_evaluation/experiments:<tag>-t5 jobs/submit-scene-search.sh ovis-bdd 2 ingest.py -- source=dataset dataset=bdd100k "'ingest_models=[ovis_vl_embedding_2b]'"
 GPU_TIER=mid MEMORY=40Gi jobs/submit-scene-search.sh jina5-acdc 2 ingest.py -- source=dataset dataset=acdc "'ingest_models=[jina_v5_omni_small]'"
 ```
 

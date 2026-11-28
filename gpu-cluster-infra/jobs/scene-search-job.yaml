@@ -18,6 +18,7 @@ spec:
       restartPolicy: Never
       runtimeClassName: nvidia
       imagePullSecrets:
+        - name: ecr-cred
         - name: dockerhub-cred
       nodeSelector:
         gpu-tier: ${GPU_TIER}
